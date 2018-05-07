@@ -3,6 +3,7 @@ package lfcrypt
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"testing"
 )
 
@@ -200,6 +201,23 @@ func TestBrokenHeader(t *testing.T) {
 	err = ec.Decrypt(src, dst)
 	if err != ErrNoMatchingKey {
 		t.Fatalf("expected ErrNoMatchingKey error: %v", err)
+	}
+
+	keydata, err := json.Marshal(&keyId{
+		KeyID: 42,
+	})
+	if err != nil {
+		t.Fatalf("json error: %v", err)
+	}
+	binary.BigEndian.PutUint16(buf2[:], uint16(len(keydata)))
+
+	src = bytes.NewReader([]byte("lfcrypt0" + string(buf4[:]) + string(buf2[:]) + string(keydata)))
+	kid, err := ReadKeyId(src)
+	if err != nil {
+		t.Fatalf("json error: %v", err)
+	}
+	if kid != 42 {
+		t.Fatalf("unexpected key id: %v", kid)
 	}
 }
 

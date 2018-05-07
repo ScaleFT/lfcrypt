@@ -7,33 +7,8 @@ import (
 	"encoding/json"
 	"hash"
 	"io"
-	"io/ioutil"
 )
 
-//
-// Encrypts an cleartext input Reader.  Uses chunks of AEAD data, with a header, and trailing hash block.
-//
-// File Format:
-//
-// Header: 12 bytes for version and cipher identification:
-//		"lfcrypt0":
-//		Cipher index (BigEndian.PutUint32):
-//				1: AEAD_AES_512_CBC_HMAC_SHA_512
-// Header: Metadata
-//		Length (BigEndian.PutUint16)
-//		JSON data:
-//		{
-//			key_id: uint32(SECRET_KEY_ID)
-//		}
-//
-// Data block(s):
-//		4-byte counter (BigEndian.PutUint32).  Must start at zero and increment by 1 for each chunk.
-// 		2-bytes chunk size. (BigEndian.PutUint16)
-// 		AEAD encrypted data. (up to `chunkSize`)
-//
-// Trailing hash block:
-// 		0 length data block, followed by:
-//		mac []byte: 64 byte HMAC_SHA512(secret) of file's contents, excluding the HMAC block itself.
 type writeStream struct {
 	cipher  cipher.AEAD
 	key     keyId
@@ -46,6 +21,40 @@ type writeStream struct {
 	buf4    [4]byte
 	buf2    [2]byte
 	mac     hash.Hash
+}
+
+// Encrypt writes the contents of r into a w using lfcrypt encrypted format.
+func (e *etmCryptor) Encrypt(r io.Reader, w io.Writer) error {
+	stream := writeStream{
+		key:     keyId{e.keyid},
+		cipher:  e.c,
+		r:       r,
+		w:       w,
+		counter: 0,
+		nonce:   make([]byte, e.c.NonceSize()),
+		enbuf:   make([]byte, chunkSize+e.c.Overhead()),
+		mac:     e.newTrailerHMAC(),
+	}
+
+	s := uint32(0)
+	switch e.ctype {
+	case AEAD_AES_256_CBC_HMAC_SHA_512:
+		s = AEAD_AES_256_CBC_HMAC_SHA_512_ID
+	default:
+		return ErrUnknownCipher
+	}
+
+	err := stream.writeHeader(s)
+	if err != nil {
+		return err
+	}
+
+	err = stream.copy()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (es *writeStream) writeHeader(cipher uint32) error {
@@ -223,50 +232,5 @@ func (es *writeStream) copy() error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (e *etmCryptor) Verify(r io.ReadSeeker) error {
-	err := e.Decrypt(r, ioutil.Discard)
-	if err != nil {
-		return err
-	}
-	_, err = r.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (e *etmCryptor) Encrypt(r io.Reader, w io.Writer) error {
-	stream := writeStream{
-		key:     keyId{e.keyid},
-		cipher:  e.c,
-		r:       r,
-		w:       w,
-		counter: 0,
-		nonce:   make([]byte, e.c.NonceSize()),
-		enbuf:   make([]byte, chunkSize+e.c.Overhead()),
-		mac:     e.newTrailerHMAC(),
-	}
-
-	s := uint32(0)
-	switch e.ctype {
-	case AEAD_AES_256_CBC_HMAC_SHA_512:
-		s = AEAD_AES_256_CBC_HMAC_SHA_512_ID
-	default:
-		return ErrUnknownCipher
-	}
-
-	err := stream.writeHeader(s)
-	if err != nil {
-		return err
-	}
-
-	err = stream.copy()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }

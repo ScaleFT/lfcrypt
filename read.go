@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"hash"
 	"io"
+	"io/ioutil"
 )
 
 type readStream struct {
@@ -21,6 +22,21 @@ type readStream struct {
 	buf2    [2]byte
 }
 
+// Verify validates the contents of an encrypted input Reader
+func (e *etmCryptor) Verify(r io.ReadSeeker) error {
+	err := e.Decrypt(r, ioutil.Discard)
+	if err != nil {
+		return err
+	}
+	_, err = r.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Decrypt incrementally decrypts the r into w.  Only authenticated cleartext is emitted, however
+// truncation attacks are possible, so users must ignore all output written to w if an error is returned.
 func (e *etmCryptor) Decrypt(r io.Reader, w io.Writer) error {
 	er := readStream{
 		cipher: e.c,
