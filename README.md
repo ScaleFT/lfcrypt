@@ -54,7 +54,7 @@ and implementations should ignore any unknown fields.
 
 Based on `.cipher_id`, `.encrypted_data` may contain additional interior fields:
 
-- `AEAD_AES_256_CBC_HMAC_SHA_512`: Contains a (draft-mcgrew-aead-aes-cbc-hmac-sha2-05.txt)[https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-05#section-2.1] formatted block.
+- `AEAD_AES_256_CBC_HMAC_SHA_512`: Contains a [draft-mcgrew-aead-aes-cbc-hmac-sha2-05.txt](https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-05#section-2.1) formatted block.
 
 ### Trailing MAC chunk:
 - `.mac`: Variable length mac based on `.cipher_ident`:
