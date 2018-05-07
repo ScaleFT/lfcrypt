@@ -16,7 +16,7 @@ In `lfcrypt`, the stream is authenticated incrementally. Contents of the stream 
 
 ### Avoiding Chunking Issues
 
-When designing a stream format, you must ensure that chunks in the stream are not reordered, dropped, or truncated.  `lfcrypt` prevents this by requiring an incrementing `.counter` field for every chunk.
+When designing a stream format, you must ensure that chunks in the stream are not reordered, dropped, or truncated.  `lfcrypt` prevents this by requiring an incrementing `.counter` field for every data chunk.
 
 ### Supporting Seeking
 
@@ -30,7 +30,7 @@ Because each data chunk in `lfcrypt` is it's own independent AEAD construct with
 
 - `.version`: 8 byte string. Static string: `lfcrypt0`
 - `.cipher_ident`: 4 bytes encoded in big endian (`BigEndian.PutUint32`):
-    - `1`: `AEAD_AES_512_CBC_HMAC_SHA_512`
+    - `1`: `AEAD_AES_256_CBC_HMAC_SHA_512`
 
 ### Metadata chunk
 
@@ -54,11 +54,11 @@ and implementations should ignore any unknown fields.
 
 Based on `.cipher_id`, `.encrypted_data` may contain additional interior fields:
 
-- `AEAD_AES_512_CBC_HMAC_SHA_512`: Contains a (draft-mcgrew-aead-aes-cbc-hmac-sha2-05.txt)[https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-05#section-2.1] formatted block.
+- `AEAD_AES_256_CBC_HMAC_SHA_512`: Contains a (draft-mcgrew-aead-aes-cbc-hmac-sha2-05.txt)[https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-05#section-2.1] formatted block.
 
 ### Trailing MAC chunk:
-- `.mac`: Variable length mac based on cipher `.cipher_ident`:
-  - `AEAD_AES_512_CBC_HMAC_SHA_512`: []byte: 64 byte HMAC_SHA512(secret) of all previous chunks, excluding the HMAC block itself.
+- `.mac`: Variable length mac based on `.cipher_ident`:
+  - `AEAD_AES_256_CBC_HMAC_SHA_512`: []byte: 64 byte HMAC_SHA512(secret) of all previous chunks, excluding the HMAC block itself.
 
 # License
 
