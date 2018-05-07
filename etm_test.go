@@ -2,6 +2,7 @@ package lfcrypt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 )
 
@@ -159,6 +160,46 @@ func TestReadKeyId(t *testing.T) {
 	dummy2 := ComputeKeyId(dummyKey2)
 	if keyid == dummy2 {
 		t.Fatalf("error: %v == dummy2 %v", keyid, dummy2)
+	}
+}
+
+func TestBrokenHeader(t *testing.T) {
+	ec, err := NewAES256SHA512(dummyKey)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	src := bytes.NewReader([]byte("hello world"))
+	dst := &bytes.Buffer{}
+	err = ec.Decrypt(src, dst)
+	if err == nil {
+		t.Fatalf("expected error: %v", err)
+	}
+
+	src = bytes.NewReader([]byte("lfcrypt0AAAA"))
+	dst = &bytes.Buffer{}
+	err = ec.Decrypt(src, dst)
+	if err != ErrUnknownCipher {
+		t.Fatalf("expected ErrUnknownCipher error: %v", err)
+	}
+
+	src = bytes.NewReader([]byte("lfcrypt0" + "\x00\x00" + "\x02" + "{}"))
+	dst = &bytes.Buffer{}
+	err = ec.Decrypt(src, dst)
+	if err != ErrUnknownCipher {
+		t.Fatalf("expected ErrUnknownCipher error: %v", err)
+	}
+
+	var buf4 [4]byte
+	var buf2 [2]byte
+	binary.BigEndian.PutUint32(buf4[:], AEAD_AES_256_CBC_HMAC_SHA_512_ID)
+	binary.BigEndian.PutUint16(buf2[:], 2)
+
+	src = bytes.NewReader([]byte("lfcrypt0" + string(buf4[:]) + string(buf2[:]) + "{}"))
+	dst = &bytes.Buffer{}
+	err = ec.Decrypt(src, dst)
+	if err != ErrNoMatchingKey {
+		t.Fatalf("expected ErrNoMatchingKey error: %v", err)
 	}
 }
 
