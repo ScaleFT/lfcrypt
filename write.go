@@ -30,6 +30,7 @@ func (e *etmCryptor) Encrypt(r io.Reader, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	defer e.writeBufferPool.Put(stream.enbuf)
 
 	err = stream.writeHeader()
 	if err != nil {
@@ -53,7 +54,7 @@ func (e *etmCryptor) newWriteStream(r io.Reader, w io.Writer) (*writeStream, err
 		w:          w,
 		counter:    0,
 		nonce:      make([]byte, e.c.NonceSize()),
-		enbuf:      make([]byte, chunkSize+e.c.Overhead()),
+		enbuf:      e.writeBufferPool.Get().([]byte),
 		mac:        e.newTrailerHMAC(),
 	}
 
