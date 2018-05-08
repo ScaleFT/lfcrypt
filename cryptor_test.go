@@ -9,19 +9,30 @@ import (
 
 var dummyKey = []byte("hellohelloworld1hellohelloworld1hellohelloworld1hellohelloworld1")
 var dummyKey2 = []byte("hellohelloworld1hellohelloworld1hellohelloworld1hellohelloworld2")
+var dummyKey32 = []byte("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")
 
-func TestRoundTrip(t *testing.T) {
-	src := bytes.NewReader([]byte("hello world"))
-	dst := &bytes.Buffer{}
-	roundtrip := &bytes.Buffer{}
-
+func TestRoundTrip_AES(t *testing.T) {
 	ec, err := NewAES256SHA512(dummyKey)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
+	testRoundTrip(t, ec)
+}
 
-	err = ec.Encrypt(src, dst)
+func TestRoundTrip_chacha20poly1305(t *testing.T) {
+	ec, err := NewCHACHA20POLY1305(dummyKey32)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	testRoundTrip(t, ec)
+}
 
+func testRoundTrip(t *testing.T, ec Cryptor) {
+	src := bytes.NewReader([]byte("hello world"))
+	dst := &bytes.Buffer{}
+	roundtrip := &bytes.Buffer{}
+
+	err := ec.Encrypt(src, dst)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -39,18 +50,28 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-func TestTampered(t *testing.T) {
-	src := bytes.NewReader([]byte("hello world"))
-	dst := &bytes.Buffer{}
-	roundtrip := &bytes.Buffer{}
-
+func TestTampered_AES(t *testing.T) {
 	ec, err := NewAES256SHA512(dummyKey)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
+	testTampered(t, ec)
+}
 
-	err = ec.Encrypt(src, dst)
+func TestTampered_chacha20poly1305(t *testing.T) {
+	ec, err := NewCHACHA20POLY1305(dummyKey32)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	testTampered(t, ec)
+}
 
+func testTampered(t *testing.T, ec Cryptor) {
+	src := bytes.NewReader([]byte("hello world"))
+	dst := &bytes.Buffer{}
+	roundtrip := &bytes.Buffer{}
+
+	err := ec.Encrypt(src, dst)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -66,19 +87,35 @@ func TestTampered(t *testing.T) {
 	t.Fatalf("Missing error from tampered data: enreader:%v", enreader)
 }
 
-func roundTripLargeSize(n int, t *testing.T) {
+func TestRoundTripLarge_AES(t *testing.T) {
+	ec, err := NewAES256SHA512(dummyKey)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	testRoundTripLarge(t, ec)
+}
+func TestRoundTripLarge_chacha20poly1305(t *testing.T) {
+	ec, err := NewCHACHA20POLY1305(dummyKey32)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	testRoundTripLarge(t, ec)
+}
+
+func testRoundTripLarge(t *testing.T, ec Cryptor) {
+	roundTripLargeSize(1000, t, ec)
+	roundTripLargeSize(10000*99, t, ec)
+	roundTripLargeSize((2^16)+1, t, ec)
+	roundTripLargeSize((2^16)-1, t, ec)
+}
+
+func roundTripLargeSize(n int, t *testing.T, ec Cryptor) {
 	srfbuf := make([]byte, n)
 	src := bytes.NewReader(srfbuf)
 	dst := &bytes.Buffer{}
 	roundtrip := &bytes.Buffer{}
 
-	ec, err := NewAES256SHA512(dummyKey)
-	if err != nil {
-		t.Fatalf("error: n=%v %v", n, err)
-	}
-
-	err = ec.Encrypt(src, dst)
-
+	err := ec.Encrypt(src, dst)
 	if err != nil {
 		t.Fatalf("error: n=%v %v", n, err)
 	}
@@ -95,25 +132,8 @@ func roundTripLargeSize(n int, t *testing.T) {
 	}
 }
 
-func TestRoundTripLarge(t *testing.T) {
-	roundTripLargeSize(1000, t)
-	roundTripLargeSize(10000*99, t)
-	roundTripLargeSize((2^16)+1, t)
-	roundTripLargeSize((2^16)-1, t)
-}
-
-func TestDiffKey(t *testing.T) {
-	src := bytes.NewReader([]byte("hello world"))
-	dst := &bytes.Buffer{}
-	roundtrip := &bytes.Buffer{}
-
+func TestDiffKey_AES(t *testing.T) {
 	ec, err := NewAES256SHA512(dummyKey)
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-
-	err = ec.Encrypt(src, dst)
-
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -123,13 +143,52 @@ func TestDiffKey(t *testing.T) {
 		t.Fatalf("error: %v", err)
 	}
 
-	enreader := bytes.NewReader(dst.Bytes())
+	testDiffKey(t, ec, ec2)
+}
 
-	err = ec2.Decrypt(enreader, roundtrip)
+func TestDiffKey_chacha20poly1305(t *testing.T) {
+	ec, err := NewCHACHA20POLY1305(dummyKey32)
 	if err != nil {
-		return
+		t.Fatalf("error: %v", err)
 	}
-	t.Fatalf("Missing error from different key data: enreader:%v", enreader)
+
+	ec2, err := NewCHACHA20POLY1305(dummyKey2[0:32])
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	testDiffKey(t, ec, ec2)
+}
+
+func TestDiffKey_mixed(t *testing.T) {
+	ec, err := NewAES256SHA512(dummyKey)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	ec2, err := NewCHACHA20POLY1305(dummyKey2[0:32])
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	testDiffKey(t, ec, ec2)
+}
+
+func testDiffKey(t *testing.T, ec Cryptor, ec2 Cryptor) {
+	src := bytes.NewReader([]byte("hello world"))
+	dst := &bytes.Buffer{}
+	roundtrip := &bytes.Buffer{}
+
+	err := ec.Encrypt(src, dst)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	enreader := bytes.NewReader(dst.Bytes())
+	err = ec2.Decrypt(enreader, roundtrip)
+	if err == nil {
+		t.Fatalf("Missing error from different key data: enreader:%v", enreader)
+	}
 }
 
 func TestReadKeyId(t *testing.T) {
@@ -221,16 +280,27 @@ func TestBrokenHeader(t *testing.T) {
 	}
 }
 
-func TestVerify(t *testing.T) {
-	src := bytes.NewReader([]byte("hello world"))
-	dst := &bytes.Buffer{}
-
+func TestVerify_AES(t *testing.T) {
 	ec, err := NewAES256SHA512(dummyKey)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
+	testVerify(t, ec)
+}
 
-	err = ec.Encrypt(src, dst)
+func TestVerify_chacha20poly1305(t *testing.T) {
+	ec, err := NewCHACHA20POLY1305(dummyKey[0:32])
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	testVerify(t, ec)
+}
+
+func testVerify(t *testing.T, ec Cryptor) {
+	src := bytes.NewReader([]byte("hello world"))
+	dst := &bytes.Buffer{}
+
+	err := ec.Encrypt(src, dst)
 
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -251,5 +321,4 @@ func TestVerify(t *testing.T) {
 		return
 	}
 	t.Fatalf("Missing error from different key data: enreader:%v", enreader)
-
 }

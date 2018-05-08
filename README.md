@@ -31,6 +31,7 @@ Because each data chunk in `lfcrypt` is it's own independent AEAD construct with
 - `.version`: 8 byte string. Static string: `lfcrypt0`
 - `.cipher_ident`: 4 bytes encoded in big endian (`BigEndian.PutUint32`):
     - `1`: `AEAD_AES_256_CBC_HMAC_SHA_512`
+    - `2`: `AEAD_CHACHA20_POLY1305_HMAC_SHA512`
 
 ### Metadata chunk
 
@@ -56,9 +57,14 @@ Based on `.cipher_id`, `.encrypted_data` may contain additional interior fields:
 
 - `AEAD_AES_256_CBC_HMAC_SHA_512`: Contains a [draft-mcgrew-aead-aes-cbc-hmac-sha2-05.txt](https://tools.ietf.org/html/draft-mcgrew-aead-aes-cbc-hmac-sha2-05#section-2.1) formatted block.
 
+- `AEAD_CHACHA20_POLY1305_HMAC_SHA512`:
+  - `.nonce`: 12 bytes of random nonce. The 4 bytes of `.counter` has been XOR'ed into the random nonce.
+  - `.data`: Remaining encrypted data.
+
 ### Trailing MAC chunk:
 - `.mac`: Variable length mac based on `.cipher_ident`:
   - `AEAD_AES_256_CBC_HMAC_SHA_512`: []byte: 64 byte HMAC_SHA512(secret) of all previous chunks, excluding the HMAC block itself.
+  - `AEAD_CHACHA20_POLY1305_HMAC_SHA512`: []byte: 64 byte HMAC_SHA512(secret) of all previous chunks, excluding the HMAC block itself.
 
 # License
 
