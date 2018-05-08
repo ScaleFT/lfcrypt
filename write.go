@@ -26,27 +26,12 @@ type writeStream struct {
 
 // Encrypt writes the contents of r into a w using lfcrypt encrypted format.
 func (e *etmCryptor) Encrypt(r io.Reader, w io.Writer) error {
-	stream := writeStream{
-		key:        keyId{e.keyid},
-		cipherType: e.cipherType,
-		cipher:     e.c,
-		r:          r,
-		w:          w,
-		counter:    0,
-		nonce:      make([]byte, e.c.NonceSize()),
-		enbuf:      make([]byte, chunkSize+e.c.Overhead()),
-		mac:        e.newTrailerHMAC(),
+	stream, err := e.newWriteStream(r, w)
+	if err != nil {
+		return err
 	}
 
-	s := uint32(0)
-	switch e.cipherType {
-	case AEAD_AES_256_CBC_HMAC_SHA_512_ID, AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID:
-		s = e.cipherType
-	default:
-		return ErrUnknownCipher
-	}
-
-	err := stream.writeHeader(s)
+	err = stream.writeHeader()
 	if err != nil {
 		return err
 	}
@@ -59,7 +44,23 @@ func (e *etmCryptor) Encrypt(r io.Reader, w io.Writer) error {
 	return nil
 }
 
-func (es *writeStream) writeHeader(cipher uint32) error {
+func (e *etmCryptor) newWriteStream(r io.Reader, w io.Writer) (*writeStream, error) {
+	stream := &writeStream{
+		key:        keyId{e.keyid},
+		cipherType: e.cipherType,
+		cipher:     e.c,
+		r:          r,
+		w:          w,
+		counter:    0,
+		nonce:      make([]byte, e.c.NonceSize()),
+		enbuf:      make([]byte, chunkSize+e.c.Overhead()),
+		mac:        e.newTrailerHMAC(),
+	}
+
+	return stream, nil
+}
+
+func (es *writeStream) writeHeader() error {
 	n, err := io.WriteString(es.w, headerStr)
 	es.mac.Write([]byte(headerStr))
 	if err != nil {
@@ -69,7 +70,7 @@ func (es *writeStream) writeHeader(cipher uint32) error {
 		return ErrShortWrite
 	}
 
-	binary.BigEndian.PutUint32(es.buf4[:], cipher)
+	binary.BigEndian.PutUint32(es.buf4[:], uint32(es.cipherType))
 	n, err = es.w.Write(es.buf4[:])
 	es.mac.Write(es.buf4[:])
 	if err != nil {
@@ -137,7 +138,6 @@ func (es *writeStream) refreshNonce(counter uint32) error {
 	}
 
 	for i := 0; i < len(es.nonce); i++ {
-
 		es.nonce[i] = es.nonce[i] ^ es.buf4[i%4]
 	}
 	return nil
