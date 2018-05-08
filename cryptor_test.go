@@ -160,6 +160,20 @@ func TestDiffKey_chacha20poly1305(t *testing.T) {
 	testDiffKey(t, ec, ec2)
 }
 
+func TestDiffKey_mixed(t *testing.T) {
+	ec, err := NewAES256SHA512(dummyKey)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	ec2, err := NewCHACHA20POLY1305(dummyKey2[0:32])
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	testDiffKey(t, ec, ec2)
+}
+
 func testDiffKey(t *testing.T, ec Cryptor, ec2 Cryptor) {
 	src := bytes.NewReader([]byte("hello world"))
 	dst := &bytes.Buffer{}
@@ -172,10 +186,9 @@ func testDiffKey(t *testing.T, ec Cryptor, ec2 Cryptor) {
 
 	enreader := bytes.NewReader(dst.Bytes())
 	err = ec2.Decrypt(enreader, roundtrip)
-	if err != nil {
-		return
+	if err == nil {
+		t.Fatalf("Missing error from different key data: enreader:%v", enreader)
 	}
-	t.Fatalf("Missing error from different key data: enreader:%v", enreader)
 }
 
 func TestReadKeyId(t *testing.T) {
