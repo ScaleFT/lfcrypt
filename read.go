@@ -12,14 +12,15 @@ import (
 )
 
 type readStream struct {
-	cipher  cipher.AEAD
-	key     keyId
-	counter uint32
-	r       io.Reader
-	w       io.Writer
-	mac     hash.Hash
-	buf4    [4]byte
-	buf2    [2]byte
+	cipher     cipher.AEAD
+	cipherType uint32
+	key        keyId
+	counter    uint32
+	r          io.Reader
+	w          io.Writer
+	mac        hash.Hash
+	buf4       [4]byte
+	buf2       [2]byte
 }
 
 // Verify validates the contents of an encrypted input Reader
@@ -81,7 +82,10 @@ func (er *readStream) readHeader() error {
 
 	switch cipherType {
 	case AEAD_AES_256_CBC_HMAC_SHA_512_ID:
-		// TODO: other cipher types
+		er.cipherType = AEAD_AES_256_CBC_HMAC_SHA_512_ID
+		break
+	case AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID:
+		er.cipherType = AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID
 		break
 	default:
 		return ErrUnknownCipher
@@ -168,7 +172,25 @@ func (er *readStream) readSealedData(slen uint16) error {
 
 	er.mac.Write(buf)
 
-	clearbuf, err = er.cipher.Open(clearbuf, nil, buf, []byte{})
+	var nonce []byte
+	switch er.cipherType {
+	case AEAD_AES_256_CBC_HMAC_SHA_512_ID:
+		// `etm` library handles the nonce encoding without using the golang AEAD interface.
+		nonce = nil
+		break
+	case AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID:
+		ns := er.cipher.NonceSize()
+		if len(buf) < ns {
+			return ErrShortRead
+		}
+		nonce = buf[0:ns]
+		buf = buf[ns:]
+		break
+	default:
+		return ErrUnknownCipher
+	}
+
+	clearbuf, err = er.cipher.Open(clearbuf, nonce, buf, []byte{})
 
 	if err != nil {
 		return err
@@ -227,7 +249,7 @@ func (er *readStream) copy() error {
 	return nil
 }
 
-// Read a KeyID block from a Reader. Note that the KeyID data is not authenticated or validated.
+// ReadKeyId reads a KeyID block from a Reader. Note that the KeyID data is not authenticated or validated.
 func ReadKeyId(r io.Reader) (uint32, error) {
 	er := readStream{
 		r: r,
