@@ -7,6 +7,7 @@ import (
 	"crypto/sha512"
 	"encoding/binary"
 	"hash"
+	"sync"
 
 	"github.com/codahale/etm"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -50,6 +51,11 @@ func NewAES256SHA512(secret []byte) (Cryptor, error) {
 		c:          e,
 		mac:        crypto.SHA512,
 		cipherType: AEAD_AES_256_CBC_HMAC_SHA_512_ID,
+		writeBufferPool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, chunkSize+e.Overhead())
+			},
+		},
 	}, nil
 }
 
@@ -67,6 +73,11 @@ func NewCHACHA20POLY1305(secret []byte) (Cryptor, error) {
 		c:          e,
 		mac:        crypto.SHA512,
 		cipherType: AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID,
+		writeBufferPool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, chunkSize+e.Overhead())
+			},
+		},
 	}, nil
 }
 
@@ -78,11 +89,12 @@ func ComputeKeyId(key []byte) uint32 {
 }
 
 type etmCryptor struct {
-	keyid      uint32
-	cipherType uint32
-	secret     []byte
-	mac        crypto.Hash
-	c          cipher.AEAD
+	keyid           uint32
+	cipherType      uint32
+	secret          []byte
+	mac             crypto.Hash
+	c               cipher.AEAD
+	writeBufferPool sync.Pool
 }
 
 func (e *etmCryptor) KeyId() uint32 {
