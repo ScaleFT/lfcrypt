@@ -25,7 +25,7 @@ type writeStream struct {
 }
 
 // Encrypt writes the contents of r into a w using lfcrypt encrypted format.
-func (e *etmCryptor) Encrypt(r io.Reader, w io.Writer) error {
+func (e *aeadCryptor) Encrypt(r io.Reader, w io.Writer) error {
 	stream, err := e.newWriteStream(r, w)
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func (e *etmCryptor) Encrypt(r io.Reader, w io.Writer) error {
 	return nil
 }
 
-func (e *etmCryptor) newWriteStream(r io.Reader, w io.Writer) (*writeStream, error) {
+func (e *aeadCryptor) newWriteStream(r io.Reader, w io.Writer) (*writeStream, error) {
 	stream := &writeStream{
 		key:        keyId{e.keyid},
 		cipherType: e.cipherType,

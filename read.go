@@ -24,7 +24,7 @@ type readStream struct {
 }
 
 // Verify validates the contents of an encrypted input Reader
-func (e *etmCryptor) Verify(r io.ReadSeeker) error {
+func (e *aeadCryptor) Verify(r io.ReadSeeker) error {
 	err := e.Decrypt(r, ioutil.Discard)
 	if err != nil {
 		return err
@@ -38,7 +38,7 @@ func (e *etmCryptor) Verify(r io.ReadSeeker) error {
 
 // Decrypt incrementally decrypts the r into w.  Only authenticated cleartext is emitted, however
 // truncation attacks are possible, so users must ignore all output written to w if an error is returned.
-func (e *etmCryptor) Decrypt(r io.Reader, w io.Writer) error {
+func (e *aeadCryptor) Decrypt(r io.Reader, w io.Writer) error {
 	er := readStream{
 		cipher: e.c,
 		r:      r,
