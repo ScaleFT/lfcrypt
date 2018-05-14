@@ -6,7 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/binary"
-	"hash"
+	"strconv"
 	"sync"
 
 	"github.com/codahale/etm"
@@ -45,18 +45,7 @@ func NewAES256SHA512(secret []byte) (Cryptor, error) {
 		return nil, err
 	}
 
-	return &etmCryptor{
-		keyid:      ComputeKeyId(secret),
-		secret:     secret,
-		c:          e,
-		mac:        crypto.SHA512,
-		cipherType: AEAD_AES_256_CBC_HMAC_SHA_512_ID,
-		writeBufferPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, chunkSize+e.Overhead())
-			},
-		},
-	}, nil
+	return newCryptor(e, AEAD_AES_256_CBC_HMAC_SHA_512_ID, secret), nil
 }
 
 // NewCHACHA20POLY1305 constructs a Cryptor with an AEAD construct with ChaCha20-Poly1305 AEAD encryption and SHA-512 MACs
@@ -67,18 +56,7 @@ func NewCHACHA20POLY1305(secret []byte) (Cryptor, error) {
 		return nil, err
 	}
 
-	return &etmCryptor{
-		keyid:      ComputeKeyId(secret),
-		secret:     secret,
-		c:          e,
-		mac:        crypto.SHA512,
-		cipherType: AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID,
-		writeBufferPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, chunkSize+e.Overhead())
-			},
-		},
-	}, nil
+	return newCryptor(e, AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID, secret), nil
 }
 
 func ComputeKeyId(key []byte) uint32 {
@@ -95,12 +73,37 @@ type etmCryptor struct {
 	mac             crypto.Hash
 	c               cipher.AEAD
 	writeBufferPool sync.Pool
+	macPool         sync.Pool
+}
+
+func newCryptor(e cipher.AEAD, cipherType uint32, secret []byte) *etmCryptor {
+	var mac crypto.Hash
+	switch cipherType {
+	case AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID, AEAD_AES_256_CBC_HMAC_SHA_512_ID:
+		mac = crypto.SHA512
+	default:
+		panic(strconv.FormatUint(uint64(cipherType), 10) + " is not a known cipher type")
+	}
+
+	return &etmCryptor{
+		keyid:      ComputeKeyId(secret),
+		secret:     secret,
+		c:          e,
+		mac:        mac,
+		cipherType: cipherType,
+		writeBufferPool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, chunkSize+e.Overhead())
+			},
+		},
+		macPool: sync.Pool{
+			New: func() interface{} {
+				return hmac.New(mac.New, secret)
+			},
+		},
+	}
 }
 
 func (e *etmCryptor) KeyId() uint32 {
 	return e.keyid
-}
-
-func (e *etmCryptor) newTrailerHMAC() hash.Hash {
-	return hmac.New(e.mac.New, e.secret)
 }
