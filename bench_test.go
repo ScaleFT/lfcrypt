@@ -7,6 +7,24 @@ import (
 	"testing"
 )
 
+func BenchmarkDecryptSmall_AES(b *testing.B) {
+	ec, err := NewAES256SHA512(dummyKey)
+	if err != nil {
+		b.Fatalf("error: %v", err)
+	}
+	src := bytes.NewReader([]byte("hello world"))
+	benchDecrypt(b, ec, src)
+}
+
+func BenchmarkDecryptSmall_chacha20poly1305(b *testing.B) {
+	ec, err := NewCHACHA20POLY1305(dummyKey32)
+	if err != nil {
+		b.Fatalf("error: %v", err)
+	}
+	src := bytes.NewReader([]byte("hello world"))
+	benchDecrypt(b, ec, src)
+}
+
 func BenchmarkEncryptSmall_AES(b *testing.B) {
 	ec, err := NewAES256SHA512(dummyKey)
 	if err != nil {
@@ -49,6 +67,24 @@ func benchEncrypt(b *testing.B, ec Cryptor, src io.ReadSeeker) {
 		src.Seek(0, io.SeekStart)
 		dst := &bytes.Buffer{}
 		err := ec.Encrypt(src, dst)
+		if err != nil {
+			b.Fatalf("error: %v", err)
+		}
+	}
+}
+
+func benchDecrypt(b *testing.B, ec Cryptor, src io.ReadSeeker) {
+	src.Seek(0, io.SeekStart)
+	endata := &bytes.Buffer{}
+	err := ec.Encrypt(src, endata)
+	if err != nil {
+		b.Fatalf("error: %v", err)
+	}
+	enrdr := bytes.NewReader(endata.Bytes())
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		enrdr.Seek(0, io.SeekStart)
+		err := ec.Decrypt(enrdr, ioutil.Discard)
 		if err != nil {
 			b.Fatalf("error: %v", err)
 		}
