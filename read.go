@@ -43,8 +43,12 @@ func (e *etmCryptor) Decrypt(r io.Reader, w io.Writer) error {
 		cipher: e.c,
 		r:      r,
 		w:      w,
-		mac:    e.newTrailerHMAC(),
+		mac:    e.macPool.Get().(hash.Hash),
 	}
+	defer func() {
+		er.mac.Reset()
+		e.macPool.Put(er.mac)
+	}()
 
 	err := er.readHeader()
 	if err != nil {
