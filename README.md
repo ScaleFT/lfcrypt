@@ -1,5 +1,8 @@
 # lfcrypt
 
+[![GoDoc](https://godoc.org/github.com/ScaleFT/lfcrypt?status.svg)](https://godoc.org/github.com/ScaleFT/lfcrypt)
+[![Build Status](https://travis-ci.org/ScaleFT/lfcrypt.svg?branch=master)](https://travis-ci.org/ScaleFT/lfcrypt)
+
 `lfcrypt` is a Go library for the symmetric encryption of large files.  This includes streaming reading and writing, and a trailer section ensuring a complete file.
 
 The file extension `.lfenc` is used for streams encrypted with this format.
