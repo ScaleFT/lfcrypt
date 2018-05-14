@@ -45,7 +45,7 @@ func NewAES256SHA512(secret []byte) (Cryptor, error) {
 		return nil, err
 	}
 
-	return newCryptor(e, AEAD_AES_256_CBC_HMAC_SHA_512_ID, secret), nil
+	return newAEADCryptor(e, AEAD_AES_256_CBC_HMAC_SHA_512_ID, secret), nil
 }
 
 // NewCHACHA20POLY1305 constructs a Cryptor with an AEAD construct with ChaCha20-Poly1305 AEAD encryption and SHA-512 MACs
@@ -56,7 +56,7 @@ func NewCHACHA20POLY1305(secret []byte) (Cryptor, error) {
 		return nil, err
 	}
 
-	return newCryptor(e, AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID, secret), nil
+	return newAEADCryptor(e, AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID, secret), nil
 }
 
 func ComputeKeyId(key []byte) uint32 {
@@ -66,7 +66,7 @@ func ComputeKeyId(key []byte) uint32 {
 	return binary.BigEndian.Uint32(data[0:4])
 }
 
-type etmCryptor struct {
+type aeadCryptor struct {
 	keyid           uint32
 	cipherType      uint32
 	secret          []byte
@@ -76,7 +76,7 @@ type etmCryptor struct {
 	macPool         sync.Pool
 }
 
-func newCryptor(e cipher.AEAD, cipherType uint32, secret []byte) *etmCryptor {
+func newAEADCryptor(e cipher.AEAD, cipherType uint32, secret []byte) *aeadCryptor {
 	var mac crypto.Hash
 	switch cipherType {
 	case AEAD_CHACHA20_POLY1305_HMAC_SHA512_ID, AEAD_AES_256_CBC_HMAC_SHA_512_ID:
@@ -85,7 +85,7 @@ func newCryptor(e cipher.AEAD, cipherType uint32, secret []byte) *etmCryptor {
 		panic(strconv.FormatUint(uint64(cipherType), 10) + " is not a known cipher type")
 	}
 
-	return &etmCryptor{
+	return &aeadCryptor{
 		keyid:      ComputeKeyId(secret),
 		secret:     secret,
 		c:          e,
@@ -104,6 +104,6 @@ func newCryptor(e cipher.AEAD, cipherType uint32, secret []byte) *etmCryptor {
 	}
 }
 
-func (e *etmCryptor) KeyId() uint32 {
+func (e *aeadCryptor) KeyId() uint32 {
 	return e.keyid
 }

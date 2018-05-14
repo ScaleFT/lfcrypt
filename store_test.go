@@ -37,7 +37,7 @@ func TestStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %s", err)
 	}
-	ec, ok := c4.(*etmCryptor)
+	ec, ok := c4.(*aeadCryptor)
 	if !ok {
 		t.Fatalf("Expected *etmCryptor: %T", c4)
 	}
